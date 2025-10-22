@@ -87,7 +87,8 @@ public class Main {
         app.before(AuthMiddleware.authenticate);
 
         // Define routes
-        app.post("/users", ctx -> {
+        String prefix = "/api/v1";
+        app.post(prefix + "/users", ctx -> {
             CreateUserRequest request = ctx.bodyAsClass(CreateUserRequest.class);
 
             if (request.getName() == null || request.getName().isEmpty()) {
@@ -102,7 +103,16 @@ public class Main {
             ctx.status(201).json(response);
         });
 
-        app.get("/users/{id}", ctx -> {
+        app.get(prefix + "/users/me", ctx -> {
+            userController.handleGetMe(ctx.attribute("authenticatedEmail")).ifPresentOrElse(
+                    ctx::json,
+                    () -> {
+                        throw new NotFoundException("User", ctx.attribute("authenticatedEmail"));
+                    }
+            );
+        });
+
+        app.get(prefix + "/users/{id}", ctx -> {
             try {
                 Integer id = Integer.parseInt(ctx.pathParam("id"));
                 var result = userController.handleGetUser(id);
@@ -116,16 +126,7 @@ public class Main {
             }
         });
 
-        app.get("/users/me", ctx -> {
-            userController.handleGetMe(ctx.attribute("authenticatedEmail")).ifPresentOrElse(
-                    ctx::json,
-                    () -> {
-                        throw new NotFoundException("User", ctx.attribute("authenticatedEmail"));
-                    }
-            );
-        });
-
-        app.put("/users/me", ctx -> {
+        app.put(prefix + "/users/me", ctx -> {
             UpdateMeRequest request = ctx.bodyAsClass(UpdateMeRequest.class);
 
             userController.handleUpdateMe(ctx.attribute("authenticatedEmail"), request).ifPresent(
@@ -133,11 +134,11 @@ public class Main {
 
         });
 
-        app.get("/users", ctx -> {
+        app.get(prefix + "/users", ctx -> {
             ctx.json(userController.handleListUsers());
         });
 
-        app.delete("/users/{id}", ctx -> {
+        app.delete(prefix + "/users/{id}", ctx -> {
             try {
                 Integer id = Integer.parseInt(ctx.pathParam("id"));
                 if (userController.handleDeleteUser(id)) {
@@ -150,7 +151,7 @@ public class Main {
             }
         });
 
-        app.put("/users/{id}", ctx -> {
+        app.put(prefix + "/users/{id}", ctx -> {
             try {
                 Integer id = Integer.parseInt(ctx.pathParam("id"));
                 UpdateUserRequest request = ctx.bodyAsClass(UpdateUserRequest.class);
