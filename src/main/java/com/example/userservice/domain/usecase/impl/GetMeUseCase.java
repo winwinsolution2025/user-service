@@ -1,10 +1,8 @@
 package com.example.userservice.domain.usecase.impl;
 
 import com.example.userservice.domain.entity.User;
-import com.example.userservice.domain.exception.InvalidParameterException;
+import com.example.userservice.domain.exception.NotFoundException;
 import com.example.userservice.domain.repository.UserRepository;
-
-import java.util.Optional;
 
 public class GetMeUseCase implements com.example.userservice.domain.usecase.GetMeUseCase {
     private final UserRepository repository;
@@ -14,8 +12,12 @@ public class GetMeUseCase implements com.example.userservice.domain.usecase.GetM
     }
 
     @Override
-    public Optional<User> execute(String email) {
+    public User execute(String email) {
+        var user = repository.getUserByEmail(email);
+        if (user.isEmpty()) {
+            throw new NotFoundException("User", email);
+        }
 
-        return repository.getUserByEmail(email);
+        return user.get();
     }
 }

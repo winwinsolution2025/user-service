@@ -4,9 +4,8 @@ import com.example.userservice.config.Config;
 import com.example.userservice.config.PersistenceConfig;
 import com.example.userservice.domain.exception.HttpException;
 import com.example.userservice.domain.exception.InvalidParameterException;
-import com.example.userservice.domain.exception.NotFoundException;
 import com.example.userservice.domain.usecase.impl.*;
-import com.example.userservice.dto.*;
+import com.example.userservice.dto.ErrorResponse;
 import com.example.userservice.infrastructure.controller.UserController;
 import com.example.userservice.infrastructure.middleware.AuthMiddleware;
 import com.example.userservice.infrastructure.repository.MySQLUserRepository;
@@ -88,90 +87,17 @@ public class Main {
 
         // Define routes
         String prefix = "/api/v1";
-        app.post(prefix + "/users", ctx -> {
-            CreateUserRequest request = ctx.bodyAsClass(CreateUserRequest.class);
 
-            if (request.getName() == null || request.getName().isEmpty()) {
-                throw new InvalidParameterException("Name is required");
-            }
 
-            if (request.getEmail() == null || request.getEmail().isEmpty()) {
-                throw new InvalidParameterException("Email is required");
-            }
+        app.get(prefix + "/users/me", userController.getMe);
+        app.get(prefix + "/users", userController.getUsers);
+        app.get(prefix + "/users/{id}", userController.getUser);
 
-            UserResponse response = userController.handleAddUser(request);
-            ctx.status(201).json(response);
-        });
+        app.post(prefix + "/users", userController.addUser);
+        app.put(prefix + "/users/me", userController.updateMe);
+        app.put(prefix + "/users/{id}", userController.updateUser);
+        app.delete(prefix + "/users/{id}", userController.deleteUser);
 
-        app.get(prefix + "/users/me", ctx -> {
-            userController.handleGetMe(ctx.attribute("authenticatedEmail")).ifPresentOrElse(
-                    ctx::json,
-                    () -> {
-                        throw new NotFoundException("User", ctx.attribute("authenticatedEmail"));
-                    }
-            );
-        });
-
-        app.get(prefix + "/users/{id}", ctx -> {
-            try {
-                Integer id = Integer.parseInt(ctx.pathParam("id"));
-                var result = userController.handleGetUser(id);
-                if (result.isPresent()) {
-                    ctx.json(result.get());
-                } else {
-                    throw new NotFoundException("User", id);
-                }
-            } catch (NumberFormatException e) {
-                throw new InvalidParameterException("Invalid ID format: ID must be a number");
-            }
-        });
-
-        app.put(prefix + "/users/me", ctx -> {
-            UpdateMeRequest request = ctx.bodyAsClass(UpdateMeRequest.class);
-
-            userController.handleUpdateMe(ctx.attribute("authenticatedEmail"), request).ifPresent(
-                    ctx::json);
-
-        });
-
-        app.get(prefix + "/users", ctx -> {
-            ctx.json(userController.handleListUsers());
-        });
-
-        app.delete(prefix + "/users/{id}", ctx -> {
-            try {
-                Integer id = Integer.parseInt(ctx.pathParam("id"));
-                if (userController.handleDeleteUser(id)) {
-                    ctx.status(204).result("");
-                } else {
-                    throw new NotFoundException("User", id);
-                }
-            } catch (NumberFormatException e) {
-                ctx.status(400).json(new ErrorResponse("INVALID_ID_FORMAT", "Invalid ID format: ID must be a number"));
-            }
-        });
-
-        app.put(prefix + "/users/{id}", ctx -> {
-            try {
-                Integer id = Integer.parseInt(ctx.pathParam("id"));
-                UpdateUserRequest request = ctx.bodyAsClass(UpdateUserRequest.class);
-
-                if (request.getName() == null || request.getName().isEmpty()) {
-                    ctx.status(400).json(new ErrorResponse("INVALID_REQUEST", "Name is required"));
-                    return;
-                }
-
-                if (request.getEmail() == null || request.getEmail().isEmpty()) {
-                    ctx.status(400).json(new ErrorResponse("INVALID_REQUEST", "Email is required"));
-                    return;
-                }
-
-                userController.handleUpdateUser(id, request).ifPresent(
-                        ctx::json);
-            } catch (NumberFormatException e) {
-                ctx.status(400).json(new ErrorResponse("INVALID_ID_FORMAT", "Invalid ID format: ID must be a number"));
-            }
-        });
 
         // Start the server
         app.start(Config.PORT);

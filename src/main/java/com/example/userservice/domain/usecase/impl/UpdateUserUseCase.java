@@ -1,11 +1,10 @@
 package com.example.userservice.domain.usecase.impl;
 
 import com.example.userservice.domain.entity.User;
-import com.example.userservice.domain.exception.NotFoundException;
-import com.example.userservice.dto.UpdateUserRequest;
-import com.example.userservice.domain.repository.UserRepository;
 import com.example.userservice.domain.exception.InvalidParameterException;
-import org.jetbrains.annotations.NotNull;
+import com.example.userservice.domain.exception.NotFoundException;
+import com.example.userservice.domain.repository.UserRepository;
+import com.example.userservice.dto.UpdateUserRequest;
 
 import java.util.Optional;
 
@@ -17,7 +16,7 @@ public class UpdateUserUseCase implements com.example.userservice.domain.usecase
     }
 
     @Override
-    public Optional<User> execute(Integer id, UpdateUserRequest request) {
+    public User execute(Integer id, UpdateUserRequest request) {
         if (id == null || id <= 0) {
             throw new InvalidParameterException("Invalid user ID: ID must be a positive number");
         }
@@ -37,7 +36,7 @@ public class UpdateUserUseCase implements com.example.userservice.domain.usecase
         var user = existingUserOpt.get();
         updateExistingUser(request, user);
         repository.updateUser(existingUserOpt.get());
-        return existingUserOpt;
+        return user;
     }
 
     private void updateExistingUser(UpdateUserRequest request, User existingUser) {
