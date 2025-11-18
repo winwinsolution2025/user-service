@@ -83,7 +83,12 @@ public class Main {
 
 
         // Apply authentication middleware for all path
-        app.before(AuthMiddleware.authenticate);
+        app.before(ctx -> {
+            if (ctx.method().equals(io.javalin.http.HandlerType.OPTIONS)) {
+                return;
+            }
+            AuthMiddleware.authenticate.handle(ctx);
+        });
 
         // Define routes
         String prefix = "/api/v1";
