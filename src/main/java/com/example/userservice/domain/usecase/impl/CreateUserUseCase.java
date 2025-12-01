@@ -1,5 +1,7 @@
 package com.example.userservice.domain.usecase.impl;
 
+import java.util.UUID;
+
 import com.example.userservice.domain.entity.User;
 import com.example.userservice.dto.CreateUserRequest;
 import com.example.userservice.domain.repository.UserRepository;
@@ -21,7 +23,10 @@ public class CreateUserUseCase implements com.example.userservice.domain.usecase
             throw new InvalidParameterException("Email is required");
         }
 
+        long numericId =  UUID.randomUUID().getMostSignificantBits() & Long.MAX_VALUE;
+
         User user = new User();
+        user.setUUID(numericId);
         user.setName(request.getName());
         user.setGender(request.getGender());
         user.setNickname(request.getNickname());

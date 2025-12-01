@@ -1,6 +1,5 @@
-# Default platform can be overridden when invoking make, e.g.
-#   make build PLATFORMS=linux/arm64
-PLATFORMS ?= linux/amd64
+REGISTRY := 876622472841.dkr.ecr.ap-east-1.amazonaws.com
+IMAGE := ${REGISTRY}/remy/user-service
 
 run:
 	mvn clean install
@@ -9,14 +8,6 @@ run:
 buildx:
 	docker buildx create --use
 
-# Default local build (single platform to avoid multi-platform error with docker driver)
-build/docker:
-	docker buildx build \
-	--platform $(PLATFORMS) \
-	--build-arg MAVEN_IMAGE=maven:3.9.6-eclipse-temurin-17 \
-	--build-arg JRE_IMAGE=eclipse-temurin:17-jre \
-	-t ap-singapore-1.ocir.io/axfnrpyfvlpv/user-service:latest .
-
 # Optional multi-arch build using buildx (requires container driver or containerd image store)
 # Use --push to push to registry; --load supports single-platform only.
 build/multi:
@@ -24,13 +15,25 @@ build/multi:
 	--platform linux/amd64,linux/arm64 \
 	--build-arg MAVEN_IMAGE=maven:3.9.6-eclipse-temurin-17 \
 	--build-arg JRE_IMAGE=eclipse-temurin:17-jre \
-	-t ap-singapore-1.ocir.io/axfnrpyfvlpv/user-service:latest \
+	-t $(IMAGE) \
 	--push \
       .
 
 up:
 	docker compose up
 
+login:
+	aws ecr get-login-password --region ap-east-1 \
+  | docker login --username AWS --password-stdin ${REGISTRY}
+
+pull:
+	docker pull ${IMAGE}
+
 push:
-	docker build -t ap-singapore-1.ocir.io/axfnrpyfvlpv/user-service .
-	docker push ap-singapore-1.ocir.io/axfnrpyfvlpv/user-service
+	docker build -t $(IMAGE) .
+	docker push $(IMAGE)
+
+image:
+	aws ecr list-images \
+  --repository-name remy \
+  --region ap-east-1

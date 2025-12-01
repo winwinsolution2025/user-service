@@ -21,7 +21,7 @@ public class AuthMiddleware {
         }
 
         CustomClaim claim = JwtService.getClaimFromToken(token);
-        // Add the authenticated email to the context for use in handlers
+        //add email to context
         ctx.attribute("authenticatedEmail", claim.getEmail());
 
         // bypass authentication for create a new user
@@ -36,5 +36,7 @@ public class AuthMiddleware {
         if (!claim.getRole().equals("ADMIN")) {
             throw new HttpResponseException(403, "Insufficient privileges");
         }
+
+
     };
 } 

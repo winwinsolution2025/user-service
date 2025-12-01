@@ -1,12 +1,13 @@
 package com.example.userservice.infrastructure.repository;
 
 import com.example.userservice.domain.entity.User;
+import com.example.userservice.domain.exception.NotFoundException;
 import com.example.userservice.domain.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
 
 public class MySQLUserRepository implements UserRepository {
     private final EntityManagerFactory emf;
@@ -30,7 +31,7 @@ public class MySQLUserRepository implements UserRepository {
                     .setParameter("email", email)
                     .getResultList();
 
-            return results.isEmpty()?Optional.empty():Optional.of(results.get(0));
+            return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
         }
     }
 
@@ -52,17 +53,22 @@ public class MySQLUserRepository implements UserRepository {
     }
 
     @Override
-    public boolean deleteUser(Integer id) {
-        try (EntityManager em = emf.createEntityManager()) {
+    public void deleteUser(Integer id) {
+        EntityManager em = emf.createEntityManager();
+        try {
             em.getTransaction().begin();
             User user = em.find(User.class, id);
-            if (user != null) {
-                em.remove(user);
-                em.getTransaction().commit();
-                return true;
+            if (user == null) {
+                throw new NotFoundException("user", id);
             }
+
+            em.remove(user);
+            em.getTransaction().commit();
+        } catch (Exception e) {
             em.getTransaction().rollback();
-            return false;
+            throw e;
+        } finally {
+            em.close();
         }
     }
 

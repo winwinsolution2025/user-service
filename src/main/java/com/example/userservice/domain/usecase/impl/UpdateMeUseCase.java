@@ -15,7 +15,7 @@ public class UpdateMeUseCase implements com.example.userservice.domain.usecase.U
     }
 
     @Override
-    public User execute(String email, UpdateMeRequest request) {
+    public Optional<User> execute(String email, UpdateMeRequest request) {
 
         // First get the existing user
         Optional<User> existingUserOpt = repository.getUserByEmail(email);
@@ -26,7 +26,7 @@ public class UpdateMeUseCase implements com.example.userservice.domain.usecase.U
         var user = existingUserOpt.get();
         updateExistingUser(request, user);
         repository.updateUser(existingUserOpt.get());
-        return user;
+        return existingUserOpt;
     }
 
     private void updateExistingUser(UpdateMeRequest request, User existingUser) {

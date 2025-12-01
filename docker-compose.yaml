@@ -1,6 +1,6 @@
 services:
   user:
-    image: "user-service"
+    image: "ap-singapore-1.ocir.io/axfnrpyfvlpv/user-service"
     ports:
       - "8080:8080"
     environment:

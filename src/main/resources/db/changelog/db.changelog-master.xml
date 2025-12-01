@@ -9,4 +9,5 @@
     <include file="db/changelog/changes/002-add-user-additional-fields.xml"/>
     <include file="db/changelog/changes/003-change-user-id-to-integer.xml"/>
     <include file="db/changelog/changes/004-add-email-to-user.xml"/>
+    <include file="db/changelog/changes/005-add-uuid-to-user.xml"/>
 </databaseChangeLog>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.4.xsd">
+
+    <changeSet id="005" author="user-service">
+        <addColumn tableName="users">
+            <column name="uuid" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        
+        <update tableName="users">
+            <column name="uuid" valueComputed="id" />
+        </update>
+
+        <addUniqueConstraint tableName="users"
+            columnNames="uuid"
+            constraintName="uk_users_uuid"/>
+
+        <rollback>
+            <dropUniqueConstraint tableName="users" constraintName="uk_users_uuid"/>
+            <dropColumn tableName="users" columnName="uuid"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog> 

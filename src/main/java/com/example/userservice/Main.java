@@ -26,6 +26,8 @@ import liquibase.database.jvm.JdbcConnection;
 import liquibase.resource.ClassLoaderResourceAccessor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -34,6 +36,7 @@ import java.sql.SQLIntegrityConstraintViolationException;
 import static com.example.userservice.Main.HttpStatus.*;
 
 public class Main {
+    private static final Logger appLog = LoggerFactory.getLogger(Main.class);
     private static EntityManagerFactory emf;
 
     public static void main(String[] args) throws Exception {
@@ -56,13 +59,15 @@ public class Main {
         // Add custom error handler
 
         // parse request exception
-        app.exception(UnrecognizedPropertyException.class, (e, ctx) -> {
-            throw new InvalidParameterException(e.getMessage());
-        });
+
 
         app.exception(HttpException.class, (e, ctx) -> {
             ctx.status(e.getStatus());
             ctx.json(new ErrorResponse(getStatusMessage(e.getStatus()), e.getMessage()));
+        });
+
+        app.exception(UnrecognizedPropertyException.class, (e, ctx) -> {
+            throw new InvalidParameterException(e.getMessage());
         });
 
         app.exception(HttpResponseException.class, (e, ctx) -> {
@@ -81,31 +86,37 @@ public class Main {
             }
         });
 
+        app.exception(RuntimeException.class, (e, ctx) -> {
+            ctx.status(HttpStatus.INTERNAL_SERVER_ERROR);
+            ctx.json(new ErrorResponse(getStatusMessage(HttpStatus.INTERNAL_SERVER_ERROR), e.getMessage()));
+        });
+
 
         // Apply authentication middleware for all path
+        
         app.before(ctx -> {
-            if (ctx.method().equals(io.javalin.http.HandlerType.OPTIONS)) {
-                return;
-            }
+            if (ctx.method().equals(io.javalin.http.HandlerType.OPTIONS)) return;
             AuthMiddleware.authenticate.handle(ctx);
         });
 
-        // Define routes
         String prefix = "/api/v1";
-
+        // Define routes
+        app.post(prefix + "/users", userController.addUser);
 
         app.get(prefix + "/users/me", userController.getMe);
-        app.get(prefix + "/users", userController.getUsers);
+
         app.get(prefix + "/users/{id}", userController.getUser);
 
-        app.post(prefix + "/users", userController.addUser);
         app.put(prefix + "/users/me", userController.updateMe);
-        app.put(prefix + "/users/{id}", userController.updateUser);
+
+        app.get(prefix + "/users", userController.listUsers);
+
         app.delete(prefix + "/users/{id}", userController.deleteUser);
 
+        app.put(prefix + "/users/{id}", userController.updateUser);
 
         // Start the server
-        app.start(Config.PORT);
+        app.start("0.0.0.0", Config.PORT);
         System.out.println("Server started on port " + Config.PORT);
 
         // Add shutdown hook

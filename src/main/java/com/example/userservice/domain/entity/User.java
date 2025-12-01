@@ -13,6 +13,7 @@ public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
+    private Long uuid;
     private String name;
     private String gender;
     private String nickname;
@@ -31,7 +32,15 @@ public class User {
         this.id = id;
     }
 
-    public String getName() {
+    public Long getUUID() {
+        return uuid;
+    }
+
+    public void setUUID(Long uuid) {
+        this.uuid = uuid;
+    }
+
+    public String getName(){
         return name;
     }
 
