@@ -1,0 +1,67 @@
+builddev:
+  stage: build
+  extends: .buildkit
+  needs:
+    - job: trufflehog
+      optional: true
+    - job: semgrep
+      optional: true
+    - job: envfile
+      optional: true
+  tags:
+    - shared
+  
+  script:
+    - | 
+      set -euo pipefail
+
+      mkdir -p ~/.docker
+      echo "{\"credsStore\":\"ecr-login\"}" > ~/.docker/config.json
+  
+      BUILD_ARG=""
+      SECRET_ARG=""
+      
+      for var in $(set | grep '^BUILD_ARG_' | cut -d= -f1); do
+        key="${var#BUILD_ARG_}"
+        value="$(eval echo \$$var)"
+        BUILD_ARG="$BUILD_ARG --opt build-arg:${key}=${value}"
+      done
+
+      for var in $(set | grep '^BUILD_SECRET' | cut -d= -f1); do
+        if [[ "$var" =~ ^BUILD_SECRET_FILE_ ]]; then
+          key="${var#BUILD_SECRET_FILE_}"
+          lower_key="$(echo "$key" | tr '[:upper:]' '[:lower:]')"
+          file_path="$(eval echo \$$var)"
+          SECRET_ARG="$SECRET_ARG --secret id=${lower_key},src=${file_path}"
+        elif [[ "$var" =~ ^BUILD_SECRET_ ]]; then
+          key="${var#BUILD_SECRET_}"
+          lower_key="$(echo "$key" | tr '[:upper:]' '[:lower:]')"
+          SECRET_ARG="$SECRET_ARG --secret id=${lower_key},env=${var}"
+        fi
+      done
+
+      TARGET_ARG=""
+      if [ -n "${DOCKERFILE_TARGET:-}" ]; then
+        TARGET_ARG="--opt target=${DOCKERFILE_TARGET}"
+      fi
+
+      buildctl-daemonless.sh --addr tcp://buildkit-buildkit-service.buildkit.svc.cluster.local:1234 build \
+        --frontend dockerfile.v0 \
+        --local context=${CONTEXT} \
+        --local dockerfile=${DOCKERFILE_PATH:-${CONTEXT}} \
+        --opt filename=./${DOCKERFILE:-Dockerfile} \
+        ${TARGET_ARG} \
+        --export-cache type=registry,mode=max,compression=zstd,ref=${ECR_CACHE} \
+        --import-cache type=registry,ref=${ECR_CACHE} \
+        ${BUILD_ARG} ${SECRET_ARG} --output type=image,name=${ECR_REPOSITORY}:latest,push=true --metadata-file metadata.json
+
+      IMAGE_DIGEST=$(jq -r '."containerimage.digest"' metadata.json)
+
+      cosign sign \
+        --key awskms:///alias/gitlab-cosign \
+        ${ECR_REPOSITORY}@${IMAGE_DIGEST} -y
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      when: on_success
+    - when: never
