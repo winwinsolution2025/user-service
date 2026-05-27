@@ -1,6 +1,6 @@
 services:
   user:
-    image: "ap-singapore-1.ocir.io/axfnrpyfvlpv/user-service"
+    image: "876622472841.dkr.ecr.ap-east-1.amazonaws.com/remy/user-service"
     ports:
       - "8080:8080"
     environment:

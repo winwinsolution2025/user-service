@@ -6,8 +6,12 @@ import com.example.userservice.domain.exception.NotFoundException;
 import com.example.userservice.domain.usecase.impl.*;
 import com.example.userservice.dto.*;
 import io.javalin.http.Handler;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class UserController {
@@ -27,13 +31,15 @@ public class UserController {
     public final Handler deleteUser;
     public final Handler listUsers;
 
-    public UserController(GetUserUseCase getUserUseCase,
+    public UserController(Validator validator,
+                          GetUserUseCase getUserUseCase,
                           GetMeUseCase getMeUseCase,
                           CreateUserUseCase createUserUseCase,
                           ListUsersUseCase listUsersUseCase,
                           DeleteUserUseCase deleteUserUseCase,
                           UpdateUserUseCase updateUserUseCase,
-                          UpdateMeUseCase updateMeUseCase) {
+                          UpdateMeUseCase updateMeUseCase
+    ) {
         this.getUserUseCase = getUserUseCase;
         this.getMeUseCase = getMeUseCase;
         this.createUserUseCase = createUserUseCase;
@@ -44,7 +50,18 @@ public class UserController {
 
 
         listUsers = (ctx) -> {
-            List<UserResponse> response = this.listUsersUseCase.execute().stream()
+            Integer[] ids = null;
+            String paramIds = ctx.queryParam("ids");
+            if (paramIds != null) {
+                String[] arr = paramIds.split(",");
+                ids = Arrays.stream(arr)
+                        .map(String::trim)
+                        .map(Integer::valueOf)
+                        .toArray(Integer[]::new);
+            }
+
+
+            List<UserResponse> response = this.listUsersUseCase.execute(ids).stream()
                     .map(this::mapToResponse)
                     .collect(Collectors.toList());
 
@@ -105,12 +122,15 @@ public class UserController {
         addUser = (ctx) -> {
             CreateUserRequest request = ctx.bodyAsClass(CreateUserRequest.class);
 
-            if (request.getName() == null || request.getName().isEmpty()) {
-                throw new InvalidParameterException("Name is required");
-            }
+            Set<ConstraintViolation<CreateUserRequest>> violations = validator.validate(request);
 
-            if (request.getEmail() == null || request.getEmail().isEmpty()) {
-                throw new InvalidParameterException("Email is required");
+            if (!violations.isEmpty()) {
+                StringBuilder sb = new StringBuilder();
+                for (ConstraintViolation<CreateUserRequest> v : violations) {
+                    sb.append(v.getPropertyPath()).append(": ").append(v.getMessage()).append("\n");
+                }
+
+                throw new InvalidParameterException(sb.toString());
             }
 
             User user = this.createUserUseCase.execute(request);
@@ -138,6 +158,8 @@ public class UserController {
         response.setGender(user.getGender());
         response.setNickname(user.getNickname());
         response.setAvatar(user.getAvatar());
+        response.setAvatarId(user.getAvatarId());
+        response.setAvatarFrameId(user.getAvatarFrameId());
         response.setBirthdate(user.getBirthdate());
         response.setEmail(user.getEmail());
         return response;

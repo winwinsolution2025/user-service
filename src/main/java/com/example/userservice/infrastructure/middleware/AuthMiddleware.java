@@ -6,6 +6,8 @@ import io.javalin.http.Handler;
 import io.javalin.http.HandlerType;
 import io.javalin.http.HttpResponseException;
 
+import java.util.Arrays;
+
 public class AuthMiddleware {
     public static Handler authenticate = ctx -> {
         String authHeader = ctx.header("Authorization");
@@ -33,10 +35,10 @@ public class AuthMiddleware {
             return;
         }
 
-        if (!claim.getRole().equals("ADMIN")) {
+        String[] acceptedRoles = {"ADMIN", "API"};
+
+        if (Arrays.stream(acceptedRoles).noneMatch(claim.getRole()::equals)) {
             throw new HttpResponseException(403, "Insufficient privileges");
         }
-
-
     };
 } 

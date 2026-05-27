@@ -1,5 +1,7 @@
 package com.example.userservice.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.LocalDate;
 
 public class UpdateMeRequest {
@@ -7,6 +9,10 @@ public class UpdateMeRequest {
     private String gender;
     private String nickname;
     private String avatar;
+    @JsonProperty("avatar_id")
+    private Integer avatarId;
+    @JsonProperty("avatar_frame_id")
+    private Integer avatarFrameId;
     private LocalDate birthdate;
 
     // Getters and Setters
@@ -40,6 +46,22 @@ public class UpdateMeRequest {
 
     public void setAvatar(String avatar) {
         this.avatar = avatar;
+    }
+
+    public Integer getAvatarId() {
+        return avatarId;
+    }
+
+    public void setAvatarId(Integer avatarId) {
+        this.avatarId = avatarId;
+    }
+
+    public Integer getAvatarFrameId() {
+        return avatarFrameId;
+    }
+
+    public void setAvatarFrameId(Integer avatarFrameId) {
+        this.avatarFrameId = avatarFrameId;
     }
 
     public LocalDate getBirthdate() {

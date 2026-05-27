@@ -1,11 +1,10 @@
 package com.example.userservice.domain.usecase.impl;
 
-import java.util.UUID;
-
 import com.example.userservice.domain.entity.User;
-import com.example.userservice.dto.CreateUserRequest;
 import com.example.userservice.domain.repository.UserRepository;
-import com.example.userservice.domain.exception.InvalidParameterException;
+import com.example.userservice.dto.CreateUserRequest;
+
+import java.util.UUID;
 
 public class CreateUserUseCase implements com.example.userservice.domain.usecase.CreateUserUseCase {
     private final UserRepository repository;
@@ -16,14 +15,7 @@ public class CreateUserUseCase implements com.example.userservice.domain.usecase
 
     @Override
     public User execute(CreateUserRequest request) {
-        if (request.getName() == null || request.getName().isEmpty()) {
-            throw new InvalidParameterException("Name is required");
-        }
-        if (request.getEmail() == null || request.getEmail().isEmpty()) {
-            throw new InvalidParameterException("Email is required");
-        }
-
-        long numericId =  UUID.randomUUID().getMostSignificantBits() & Long.MAX_VALUE;
+        long numericId = UUID.randomUUID().getMostSignificantBits() & Long.MAX_VALUE;
 
         User user = new User();
         user.setUUID(numericId);
@@ -31,9 +23,16 @@ public class CreateUserUseCase implements com.example.userservice.domain.usecase
         user.setGender(request.getGender());
         user.setNickname(request.getNickname());
         user.setAvatar(request.getAvatar());
+        if (request.getAvatarId() == null || request.getAvatarFrameId() == null) {
+            request.setAvatarId(0);
+            request.setAvatarFrameId(0);
+        }
+        user.setAvatarId(request.getAvatarId());
+        user.setAvatarFrameId(request.getAvatarFrameId());
         user.setBirthdate(request.getBirthdate());
         user.setEmail(request.getEmail());
-        
+        user.setRole(request.getRole());
+
         repository.addUser(user);
         return user;
     }

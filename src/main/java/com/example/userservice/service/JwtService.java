@@ -1,14 +1,14 @@
 package com.example.userservice.service;
 
+import com.example.userservice.config.AppConfig;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+
 import java.security.Key;
 
-import com.example.userservice.config.Config;
-
 public class JwtService {
-    private static final String SECRET = Config.JWT_SECRET;
+    private static final String SECRET = AppConfig.GetInstance().getJwtSecret();
     private static final String ROLE_CLAIM = "role";
 
     private static Key getSigningKey() {
@@ -18,9 +18,9 @@ public class JwtService {
     public static boolean validateToken(String token) {
         try {
             Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
-                .build()
-                .parseClaimsJws(token);
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token);
             return true;
         } catch (Exception e) {
             return false;

@@ -1,7 +1,6 @@
 package com.example.userservice;
 
-import com.example.userservice.config.Config;
-import com.example.userservice.config.PersistenceConfig;
+import com.example.userservice.config.AppConfig;
 import com.example.userservice.domain.exception.HttpException;
 import com.example.userservice.domain.exception.InvalidParameterException;
 import com.example.userservice.domain.usecase.impl.*;
@@ -11,12 +10,18 @@ import com.example.userservice.infrastructure.middleware.AuthMiddleware;
 import com.example.userservice.infrastructure.repository.MySQLUserRepository;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import io.javalin.Javalin;
+import io.javalin.http.Context;
 import io.javalin.http.HttpResponseException;
 import io.javalin.json.JavalinJackson;
 import io.javalin.plugin.bundled.CorsPluginConfig;
-import jakarta.persistence.EntityManagerFactory;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import jakarta.validation.ValidatorFactory;
 import liquibase.Contexts;
 import liquibase.LabelExpression;
 import liquibase.Liquibase;
@@ -24,11 +29,15 @@ import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.resource.ClassLoaderResourceAccessor;
-import org.hibernate.exception.ConstraintViolationException;
 import org.jetbrains.annotations.NotNull;
+import org.jooq.DSLContext;
+import org.jooq.SQLDialect;
+import org.jooq.exception.DataAccessException;
+import org.jooq.impl.DSL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLIntegrityConstraintViolationException;
@@ -37,22 +46,27 @@ import static com.example.userservice.Main.HttpStatus.*;
 
 public class Main {
     private static final Logger appLog = LoggerFactory.getLogger(Main.class);
-    private static EntityManagerFactory emf;
+    private static final ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
 
     public static void main(String[] args) throws Exception {
-        Config.load();
-        migrate();
+        AppConfig config = AppConfig.GetInstance();
+        migrate(config);
 
-        emf = PersistenceConfig.createEntityManagerFactory();
-        var userController = getUserController();
+        Validator validator = factory.getValidator();
 
-        Javalin app = Javalin.create(config -> {
-            config.bundledPlugins.enableCors(cors -> {
+
+        DataSource ds = createHikariDataSource(config);
+        DSLContext dbCtx = DSL.using(ds, SQLDialect.MYSQL);
+        var userController = getUserController(dbCtx, validator);
+
+        Javalin app = Javalin.create(conf -> {
+            conf.bundledPlugins.enableCors(cors -> {
                 // Allow all origins
                 cors.addRule(CorsPluginConfig.CorsRule::anyHost);
             });
-            config.jsonMapper(new JavalinJackson(JsonMapper.builder()
+            conf.jsonMapper(new JavalinJackson(JsonMapper.builder()
                     .addModule(new JavaTimeModule())
+                    .addModule(new Jdk8Module())
                     .build(), true));
         });
 
@@ -62,6 +76,7 @@ public class Main {
 
 
         app.exception(HttpException.class, (e, ctx) -> {
+            addCorsHeaders(ctx);
             ctx.status(e.getStatus());
             ctx.json(new ErrorResponse(getStatusMessage(e.getStatus()), e.getMessage()));
         });
@@ -71,11 +86,14 @@ public class Main {
         });
 
         app.exception(HttpResponseException.class, (e, ctx) -> {
+            addCorsHeaders(ctx);
+            appLog.error("call service exception!", e);
             ctx.status(e.getStatus());
             ctx.json(new ErrorResponse(getStatusMessage(e.getStatus()), e.getMessage()));
         });
 
-        app.exception(ConstraintViolationException.class, (e, ctx) -> {
+        app.exception(DataAccessException.class, (e, ctx) -> {
+            addCorsHeaders(ctx);
             Throwable cause = e.getCause();
             if (cause instanceof SQLIntegrityConstraintViolationException) {
                 ctx.status(CONFLICT_RESOURCE);
@@ -87,13 +105,15 @@ public class Main {
         });
 
         app.exception(RuntimeException.class, (e, ctx) -> {
+            addCorsHeaders(ctx);
+            appLog.error("run time exception!", e);
             ctx.status(HttpStatus.INTERNAL_SERVER_ERROR);
             ctx.json(new ErrorResponse(getStatusMessage(HttpStatus.INTERNAL_SERVER_ERROR), e.getMessage()));
         });
 
 
         // Apply authentication middleware for all path
-        
+
         app.before(ctx -> {
             if (ctx.method().equals(io.javalin.http.HandlerType.OPTIONS)) return;
             AuthMiddleware.authenticate.handle(ctx);
@@ -116,21 +136,18 @@ public class Main {
         app.put(prefix + "/users/{id}", userController.updateUser);
 
         // Start the server
-        app.start("0.0.0.0", Config.PORT);
-        System.out.println("Server started on port " + Config.PORT);
+        app.start("0.0.0.0", config.getPort());
+        System.out.println("Server started on port " + config.getPort());
 
         // Add shutdown hook
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            if (emf != null) {
-                emf.close();
-            }
             app.stop();
         }));
     }
 
     @NotNull
-    private static UserController getUserController() {
-        var repository = new MySQLUserRepository(emf);
+    private static UserController getUserController(DSLContext dbCtx, Validator validator) {
+        var repository = new MySQLUserRepository(dbCtx);
 
         var getUserUseCase = new GetUserUseCase(repository);
         var getMeUseCase = new GetMeUseCase(repository);
@@ -141,6 +158,7 @@ public class Main {
         var updateMeUseCase = new UpdateMeUseCase(repository);
 
         var userController = new UserController(
+                validator,
                 getUserUseCase,
                 getMeUseCase,
                 createUserUseCase,
@@ -178,8 +196,8 @@ public class Main {
         public static final int INTERNAL_SERVER_ERROR = 500;
     }
 
-    static void migrate() {
-        try (Connection connection = DriverManager.getConnection(Config.DB_URL, Config.DB_USER, Config.DB_PASS)) {
+    static void migrate(AppConfig config) {
+        try (Connection connection = DriverManager.getConnection(config.getDbUrl(), config.getDbUser(), config.getDbPass())) {
             Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));
             try (Liquibase liquibase = new Liquibase("db/changelog/db.changelog-master.xml", new ClassLoaderResourceAccessor(), database)) {
                 liquibase.update(new Contexts(), new LabelExpression());
@@ -188,5 +206,28 @@ public class Main {
             e.printStackTrace();
             throw new RuntimeException("Migration failed", e);
         }
+    }
+    private static void addCorsHeaders(Context ctx) {
+        ctx.header("Access-Control-Allow-Origin", "*");
+        ctx.header("Access-Control-Allow-Headers", "*");
+        ctx.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+    }
+
+    private static DataSource createHikariDataSource(AppConfig cfg) {
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl(cfg.getDbUrl()); // replace with your DB
+        config.setUsername(cfg.getDbUser());
+        config.setPassword(cfg.getDbPass());
+
+        // Optional tuning
+        config.setMaximumPoolSize(10);
+        config.setMinimumIdle(2);
+        config.setConnectionTimeout(30000); // 30s
+        config.setIdleTimeout(600000);      // 10 min
+        config.setMaxLifetime(1800000);     // 30 min
+
+        // Create the HikariCP DataSource
+        HikariDataSource ds = new HikariDataSource(config);
+        return ds;
     }
 }

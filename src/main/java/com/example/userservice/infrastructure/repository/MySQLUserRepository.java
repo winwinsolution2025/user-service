@@ -1,83 +1,92 @@
 package com.example.userservice.infrastructure.repository;
 
 import com.example.userservice.domain.entity.User;
-import com.example.userservice.domain.exception.NotFoundException;
 import com.example.userservice.domain.repository.UserRepository;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityManagerFactory;
+import org.jooq.DSLContext;
 
 import java.util.List;
 import java.util.Optional;
 
-public class MySQLUserRepository implements UserRepository {
-    private final EntityManagerFactory emf;
+import static com.example.jooq.userdb.tables.Users.USERS;
 
-    public MySQLUserRepository(EntityManagerFactory emf) {
-        this.emf = emf;
+public class MySQLUserRepository implements UserRepository {
+    private final DSLContext dbCtx;
+
+    public MySQLUserRepository(DSLContext dbCtx) {
+        this.dbCtx = dbCtx;
     }
 
     @Override
     public Optional<User> getUserById(Integer id) {
-        try (var em = emf.createEntityManager()) {
-            User user = em.find(User.class, id);
-            return Optional.ofNullable(user);
-        }
+        return dbCtx.selectFrom(User.TABLE_NAME)
+                .where("id=?", id)
+                .fetchOptionalInto(User.class);
     }
 
     @Override
     public Optional<User> getUserByEmail(String email) {
-        try (EntityManager em = emf.createEntityManager()) {
-            var results = em.createQuery("SELECT u FROM User u where u.email = :email", User.class)
-                    .setParameter("email", email)
-                    .getResultList();
-
-            return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
-        }
+        return dbCtx.selectFrom(User.TABLE_NAME)
+                .where("email=?", email)
+                .fetchOptionalInto(User.class);
     }
 
     @Override
     public List<User> getAllUsers() {
-        try (EntityManager em = emf.createEntityManager()) {
-            return em.createQuery("SELECT u FROM User u", User.class)
-                    .getResultList();
-        }
+        return dbCtx.selectFrom(User.TABLE_NAME)
+                .fetchInto(User.class);
+    }
+
+    @Override
+    public List<User> getUsersByIds(Integer[] ids) {
+        return dbCtx.selectFrom(USERS)
+                .where(USERS.ID.in(ids))
+                .fetchInto(User.class);
     }
 
     @Override
     public void addUser(User user) {
-        try (EntityManager em = emf.createEntityManager()) {
-            em.getTransaction().begin();
-            em.persist(user);
-            em.getTransaction().commit();
+        var record = dbCtx.insertInto(USERS)
+                .set(USERS.EMAIL, user.getEmail())
+                .set(USERS.ROLE, user.getRole())
+                .set(USERS.AVATAR, user.getAvatar())
+                .set(USERS.AVATAR_ID, user.getAvatarId())
+                .set(USERS.AVATAR_FRAME_ID, user.getAvatarFrameId())
+                .set(USERS.BIRTHDATE, user.getBirthdate())
+                .set(USERS.GENDER, user.getGender())
+                .set(USERS.UUID, user.getUUID())
+                .set(USERS.NAME, user.getName())
+                .set(USERS.NICKNAME, user.getNickname())
+                .returning(USERS.ID)
+                .fetchOne();
+
+        if (record == null) {
+            throw new RuntimeException("Failed to insert record");
         }
+        user.setId(record.get(USERS.ID));
     }
 
     @Override
-    public void deleteUser(Integer id) {
-        EntityManager em = emf.createEntityManager();
-        try {
-            em.getTransaction().begin();
-            User user = em.find(User.class, id);
-            if (user == null) {
-                throw new NotFoundException("user", id);
-            }
+    public boolean deleteUser(Integer id) {
+        var rows = dbCtx.deleteFrom(USERS)
+                .where("id=?", id)
+                .execute();
 
-            em.remove(user);
-            em.getTransaction().commit();
-        } catch (Exception e) {
-            em.getTransaction().rollback();
-            throw e;
-        } finally {
-            em.close();
-        }
+        return rows > 0;
     }
 
     @Override
-    public void updateUser(User updatedUser) {
-        try (EntityManager em = emf.createEntityManager()) {
-            em.getTransaction().begin();
-            em.merge(updatedUser);
-            em.getTransaction().commit();
-        }
+    public boolean updateUser(User updatedUser) {
+        var rows = dbCtx.update(USERS)
+                .set(USERS.NAME, updatedUser.getName())
+                .set(USERS.NICKNAME, updatedUser.getNickname())
+                .set(USERS.GENDER, updatedUser.getGender())
+                .set(USERS.BIRTHDATE, updatedUser.getBirthdate())
+                .set(USERS.AVATAR, updatedUser.getAvatar())
+                .set(USERS.AVATAR_ID, updatedUser.getAvatarId())
+                .set(USERS.AVATAR_FRAME_ID, updatedUser.getAvatarFrameId())
+                .where("id=?", updatedUser.getId())
+                .execute();
+
+        return rows > 0;
     }
 }

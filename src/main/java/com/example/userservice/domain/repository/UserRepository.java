@@ -14,7 +14,9 @@ public interface UserRepository {
 
     List<User> getAllUsers();
 
-    void deleteUser(Integer id);
+    List<User> getUsersByIds(Integer[] ids);
 
-    void updateUser(User user);
+    boolean deleteUser(Integer id);
+
+    boolean updateUser(User user);
 }

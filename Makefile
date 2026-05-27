@@ -1,9 +1,16 @@
 REGISTRY := 876622472841.dkr.ecr.ap-east-1.amazonaws.com
 IMAGE := ${REGISTRY}/remy/user-service
 
+gen:
+	mvn clean generate-sources
+gen/jooq:
+	mvn clean install -P jooq-codegen
+in:
+	mvn clean install
+
 run:
 	mvn clean install
-	java -jar target/user-service-1.0.jar
+	java -jar target/user-service-1.0-shaded.jar
 # enable builder
 buildx:
 	docker buildx create --use
@@ -13,8 +20,6 @@ buildx:
 build/multi:
 	docker buildx build \
 	--platform linux/amd64,linux/arm64 \
-	--build-arg MAVEN_IMAGE=maven:3.9.6-eclipse-temurin-17 \
-	--build-arg JRE_IMAGE=eclipse-temurin:17-jre \
 	-t $(IMAGE) \
 	--push \
       .

@@ -27,11 +27,25 @@
               <goal>shade</goal>
             </goals>
             <configuration>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                  </excludes>
+                </filter>
+              </filters>
               <transformers>
                 <transformer>
                   <mainClass>com.example.userservice.Main</mainClass>
                 </transformer>
               </transformers>
+              <createDependencyReducedPom>true</createDependencyReducedPom>
+              <minimizeJar>false</minimizeJar>
+              <shadedArtifactAttached>true</shadedArtifactAttached>
+              <shadedClassifierName>shaded</shadedClassifierName>
             </configuration>
           </execution>
         </executions>
@@ -61,21 +75,75 @@
           </dependency>
         </dependencies>
         <configuration>
-          <url>jdbc:mysql://localhost:3306/userdb</url>
-          <username>root</username>
-          <password>root123</password>
+          <url>${env.DB_URL}</url>
+          <username>${env.DB_USER}</username>
+          <password>${env.DB_PASS}</password>
           <changeLogFile>src/main/resources/db/changelog/db.changelog-master.xml</changeLogFile>
         </configuration>
       </plugin>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
-          <source>17</source>
-          <target>17</target>
+          <source>21</source>
+          <target>21</target>
         </configuration>
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile>
+      <id>jooq-codegen</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.jooq</groupId>
+            <artifactId>jooq-codegen-maven</artifactId>
+            <version>3.20.9</version>
+            <executions>
+              <execution>
+                <id>generate-jooq</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>generate</goal>
+                </goals>
+              </execution>
+            </executions>
+            <configuration>
+              <jdbc>
+                <driver>com.mysql.cj.jdbc.Driver</driver>
+                <url>${env.DB_URL}</url>
+                <user>${env.DB_USER}</user>
+                <password>${env.DB_PASS}</password>
+              </jdbc>
+              <generator>
+                <name>org.jooq.codegen.DefaultGenerator</name>
+                <database>
+                  <name>org.jooq.meta.mysql.MySQLDatabase</name>
+                  <includes>users</includes>
+                  <forcedTypes>
+                    <forcedType>
+                      <name>TIMESTAMP</name>
+                      <userType>java.time.Instant</userType>
+                      <includeTypes>TIMESTAMP</includeTypes>
+                    </forcedType>
+                  </forcedTypes>
+                </database>
+                <generate>
+                  <daos>false</daos>
+                  <pojos>false</pojos>
+                  <records>false</records>
+                </generate>
+                <target>
+                  <packageName>com.example.jooq</packageName>
+                  <directory>src/main/java</directory>
+                </target>
+              </generator>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
   <dependencies>
     <dependency>
       <groupId>mysql</groupId>
@@ -85,6 +153,6 @@
     </dependency>
   </dependencies>
   <properties>
-    <maven.compiler.release>17</maven.compiler.release>
+    <maven.compiler.release>21</maven.compiler.release>
   </properties>
 </project>

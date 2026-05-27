@@ -43,6 +43,15 @@ public class UpdateMeUseCase implements com.example.userservice.domain.usecase.U
         if (request.getAvatar() != null) {
             existingUser.setAvatar(request.getAvatar());
         }
+
+        if (request.getAvatarId() != null) {
+            existingUser.setAvatarId(request.getAvatarId());
+        }
+
+        if (request.getAvatarFrameId() != null) {
+            existingUser.setAvatarFrameId(request.getAvatarFrameId());
+        }
+
         if (request.getBirthdate() != null) {
             existingUser.setBirthdate(request.getBirthdate());
         }

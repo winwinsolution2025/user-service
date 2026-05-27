@@ -13,7 +13,11 @@ public class ListUsersUseCase implements com.example.userservice.domain.usecase.
     }
 
     @Override
-    public List<User> execute() {
-        return repository.getAllUsers();
+    public List<User> execute(Integer[] ids) {
+        if (ids == null) {
+            return repository.getAllUsers();
+        }
+
+        return repository.getUsersByIds(ids);
     }
 } 

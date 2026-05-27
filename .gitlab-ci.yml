@@ -1,57 +1,24 @@
+include:
+  - project: "$CI_PROJECT_PATH"
+    file: "$CI_PROJECT_FILE"
+    ref: "$CI_PROJECT_REF"
+  - local: ci/.gitlab-ci-builddev.yaml
+
 stages:
-  # - debug
+  - prepare
+  - security
   - build
   - deploy
 
 variables:
-  AWS_REGION: ap-east-1                   # vùng AWS của bạn
+  APP_NAME: "$CI_PROJECT_NAME"
+  BUILD_ENV: "false"
+  PROJECT: "$CI_PROJECT_ROOT_NAMESPACE"
+
+  AWS_REGION: ap-east-1
   ECR_REGISTRY: 876622472841.dkr.ecr.ap-east-1.amazonaws.com
   IMAGE_NAME: remy/user-service
   GIT_STRATEGY: clone # clone/fetch/none
   GIT_CHECKOUT: "true"
 
-build:
-  stage: build
-  tags:
-    - dockerbuilder
-  image: docker.io/letanthang/aws-dind
-  services:
-    - name: docker:dind
-      alias: docker
-      command: [ "--tls=false" ]
-      variables:
-        HEALTHCHECK_TCP_PORT: "2375"
 
-  variables:
-    DOCKER_DRIVER: overlay2
-    DOCKER_HOST: tcp://docker:2375/
-    DOCKER_TLS_CERTDIR: ""
-  before_script:
-    - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
-    # - git clone https://$DEPLOY_USER:$DEPLOY_TOKEN@gl.owvn.org/remy/auth-service.git #use this for manual clone by Deploy Token
-    
-  script:
-    - docker buildx create --use
-    - |
-      docker buildx build \
-       --platform linux/amd64,linux/arm64 \
-       --build-arg MAVEN_IMAGE=maven:3.9.6-eclipse-temurin-17 \
-       --build-arg JRE_IMAGE=eclipse-temurin:17-jre \
-       -t $ECR_REGISTRY/$IMAGE_NAME:latest \
-       --push \
-       .
-  only:
-    - main
-
-deploy:
-  stage: deploy
-  image: alpine:latest
-  tags:
-    - dockerbuilder
-  before_script:
-    - apk add --no-cache curl bash
-  script:
-    - echo "Trigger ArgoCD sync..."
-    # - curl -X POST $ARGOCD_WEBHOOK_URL
-  only:
-    - main
