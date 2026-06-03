@@ -14,7 +14,7 @@ run:
 	mvn clean install
 	java -jar target/user-service-1.0-shaded.jar
 up:
-	docker run \
+	docker run --rm \
 	--network="host" \
 	--env-file .env \
 	$(IMAGE)
