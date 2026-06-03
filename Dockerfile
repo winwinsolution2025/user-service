@@ -2,7 +2,7 @@
 # Build stage: uses an official Maven image with a JDK to compile/package the app
 ARG MAVEN_IMAGE=maven:3.9.11-eclipse-temurin-21
 ARG JRE_IMAGE=eclipse-temurin:21-jre
-FROM ${MAVEN_IMAGE} as build
+FROM ${MAVEN_IMAGE} AS build
 WORKDIR /workspace
 
 # Copy only the files needed for dependency resolution first for better caching

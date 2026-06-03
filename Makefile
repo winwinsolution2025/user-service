@@ -7,13 +7,28 @@ gen/jooq:
 	mvn clean install -P jooq-codegen
 in:
 	mvn clean install
+mvn/build:
+	mvn clean install
 
 run:
 	mvn clean install
 	java -jar target/user-service-1.0-shaded.jar
+up:
+	docker run \
+	--network="host" \
+	--env-file .env \
+	$(IMAGE)
+
 # enable builder
 buildx:
 	docker buildx create --use
+
+build:
+	docker buildx build \
+	--platform linux/arm64 \
+	-t $(IMAGE) \
+	--load \
+      .
 
 # Optional multi-arch build using buildx (requires container driver or containerd image store)
 # Use --push to push to registry; --load supports single-platform only.
@@ -23,9 +38,6 @@ build/multi:
 	-t $(IMAGE) \
 	--push \
       .
-
-up:
-	docker compose up
 
 login:
 	aws ecr get-login-password --region ap-east-1 \
